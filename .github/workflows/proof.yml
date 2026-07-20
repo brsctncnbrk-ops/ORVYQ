@@ -20,7 +20,7 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: proof-${{ github.event_name == 'workflow_dispatch' && inputs.project_id || github.event.pull_request.head.ref || github.ref_name }}
@@ -60,6 +60,7 @@ jobs:
 
       - name: Publish proof run tracker
         if: github.event_name == 'push' || github.event_name == 'pull_request'
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,7 +72,7 @@ jobs:
           fi
           if [ -n "$PR_NUMBER" ]; then
             echo "PROOF_PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
-            gh pr comment "$PR_NUMBER" --body "ORVYQ proof run **$GITHUB_RUN_ID** started from commit \`$GITHUB_SHA\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="ORVYQ proof run **$GITHUB_RUN_ID** started from commit \`$GITHUB_SHA\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
           fi
 
       - name: Fetch and verify repository Git LFS objects
@@ -211,18 +212,22 @@ jobs:
             projects/*/assets/captures/variants/**
             projects/*/assets/graphics/generated/**
             projects/*/assets/music/**
-
       - name: Publish proof completion status
-        if: always() && env.PROOF_PR_NUMBER != ''
+        if: always() && (github.event_name == 'pull_request' || env.PROOF_PR_NUMBER != '')
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then PR_NUMBER="${PROOF_PR_NUMBER:-}"; fi
+          if [ -z "$PR_NUMBER" ]; then exit 0; fi
           if [ "$JOB_STATUS" = "success" ]; then
             MESSAGE="ORVYQ proof run **$GITHUB_RUN_ID** completed successfully. Review artifact: \`proof-$GITHUB_RUN_ID\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           else
             MESSAGE="ORVYQ proof run **$GITHUB_RUN_ID** finished with status **$JOB_STATUS**. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           fi
-          gh pr comment "$PROOF_PR_NUMBER" --body "$MESSAGE"
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$MESSAGE" >/dev/null
+
