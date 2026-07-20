@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<rect width="1920" height="1080" fill="#05070a"/>
+<circle cx="1470" cy="250" r="420" fill="#111927" opacity="0.72"/>
+<path d="M0 820 C460 690 820 970 1920 610 L1920 1080 L0 1080 Z" fill="#0d131d"/>
+<text x="150" y="470" fill="#f4f4f0" font-family="Arial,Helvetica,sans-serif" font-size="86" font-weight="700">ORVYQ STUDIO</text>
+<text x="154" y="555" fill="#aeb8c7" font-family="Arial,Helvetica,sans-serif" font-size="38">Beyond the Known</text>
+<line x1="154" y1="610" x2="720" y2="610" stroke="#d2d8e1" stroke-width="3"/>
+<text x="154" y="975" fill="#7f8997" font-family="Arial,Helvetica,sans-serif" font-size="26">ORVYQ • SOURCE-DERIVED DESIGN FIXTURE</text>
+</svg>

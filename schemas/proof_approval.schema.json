@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orvyq.local/schemas/proof_approval.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "proof_prefix_sha256", "narration_timeline_sha256", "proof_run_id", "render_source_commit", "human_review_score", "proof_boundary_frame", "approved_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project_id": {"type": "string"},
+    "proof_prefix_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "narration_timeline_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "proof_run_id": {"type": "string", "minLength": 1},
+    "render_source_commit": {"type": "string", "minLength": 7},
+    "human_review_score": {"type": "number", "minimum": 0, "maximum": 100},
+    "proof_boundary_frame": {"type": "integer", "minimum": 2},
+    "approved_at": {"type": "string", "format": "date-time"}
+  }
+}

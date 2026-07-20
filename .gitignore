@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.playwright/
+projects/*/build/*
+!projects/*/build/.gitkeep
+projects/*/output/*
+!projects/*/output/.gitkeep
+projects/*/qa/*.runtime.json
+*.log
+.DS_Store

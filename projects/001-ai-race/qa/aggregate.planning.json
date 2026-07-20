@@ -1,0 +1,68 @@
+{
+  "pass": false,
+  "stage": "planning",
+  "results": [
+    {
+      "id": "canonical-plan-schema",
+      "pass": true,
+      "applicable": true,
+      "measurements": {"fps": 30, "duration_frames": 5700, "shot_count": 19},
+      "thresholds": {"schema_version": 1},
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "id": "narration-timeline",
+      "pass": true,
+      "applicable": true,
+      "measurements": {"source_duration": 186, "output_duration": 190, "pause_count": 3, "timeline_sha256": "a6cb843d47c4cbbddc620c0fa5740dff4a628ae8890c600e51162fc5b03bd54e"},
+      "thresholds": {"timeline_matches_plan_seconds": 190},
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "id": "proof-approval-continuity",
+      "pass": true,
+      "applicable": false,
+      "measurements": {"approval": "missing"},
+      "thresholds": {"required": false},
+      "failures": [],
+      "warnings": ["Approval is not required during proof preparation"]
+    },
+    {
+      "id": "evidence-coverage",
+      "pass": true,
+      "applicable": true,
+      "measurements": {"primary_source_capture_ratio": 0.3333333333333333, "source_backed_ratio": 0.8333333333333334, "fullscreen_graphic_ratio": 0.05555555555555555, "generic_stock_ratio": 0, "longest_evidence_chain_seconds": 10, "max_asset_reuse": 3, "max_motif_reuse": 2},
+      "thresholds": {"primary_source_capture_min_ratio": 0.3, "source_backed_min_ratio": 0.6, "max_continuous_evidence_seconds": 16, "primary_capture_min_seconds": 4, "max_fullscreen_graphic_ratio": 0.1, "max_generic_stock_ratio": 0.08, "max_asset_reuse_count": 4, "max_motif_reuse_count": 3, "mobile_min_font_px": 42},
+      "failures": [],
+      "warnings": []
+    },
+    {
+      "id": "evidence-asset-integrity",
+      "pass": false,
+      "applicable": true,
+      "measurements": {"asset_count": 12, "missing": ["assets/captures/nist-ai-rmf.png", "assets/captures/eu-ai-act.png", "assets/captures/unesco-ai-ethics.png"], "empty": [], "placeholderAssets": ["assets/placeholders/context-lab.svg", "assets/placeholders/context-chip.svg", "assets/placeholders/context-grid.svg"], "missingProvenance": ["assets/captures/nist-ai-rmf.provenance.json", "assets/captures/eu-ai-act.provenance.json", "assets/captures/unesco-ai-ethics.provenance.json"]},
+      "thresholds": {"missing": 0, "empty": 0, "placeholders": 0, "missing_provenance": 0},
+      "failures": ["missing assets: assets/captures/nist-ai-rmf.png, assets/captures/eu-ai-act.png, assets/captures/unesco-ai-ethics.png", "placeholder assets are not renderable evidence: assets/placeholders/context-lab.svg, assets/placeholders/context-chip.svg, assets/placeholders/context-grid.svg", "capture provenance missing: assets/captures/nist-ai-rmf.provenance.json, assets/captures/eu-ai-act.provenance.json, assets/captures/unesco-ai-ethics.provenance.json"],
+      "warnings": []
+    },
+    {"id":"semantic-visual-alignment","pass":true,"applicable":true,"measurements":{"shot_count":19},"thresholds":{"source_backed_requires_claim_and_source":true},"failures":[],"warnings":[]},
+    {"id":"pacing","pass":true,"applicable":true,"measurements":{"min_seconds":10,"max_seconds":10},"thresholds":{"max_shot_seconds":16},"failures":[],"warnings":[]},
+    {"id":"mobile-legibility","pass":true,"applicable":true,"measurements":{"minimum_observed_px":42},"thresholds":{"minimum_px":42},"failures":[],"warnings":[]},
+    {"id":"music-cues","pass":false,"applicable":true,"measurements":{"cue_count":0,"maximum_gain_db":null},"thresholds":{"maximum_gain_db":-8},"failures":["long-form film requires at least one canonical music cue"],"warnings":[]},
+    {"id":"license-provenance","pass":true,"applicable":true,"measurements":{"active_sources":3,"primary_sources":3},"thresholds":{"all_references_resolve":true},"failures":[],"warnings":[]},
+    {"id":"edit-plan-contract","pass":false,"applicable":true,"measurements":{},"thresholds":{},"failures":["compiled edit_plan.json is missing"],"warnings":[]},
+    {"id":"alignment-readiness","pass":true,"applicable":false,"measurements":{},"thresholds":{},"failures":[],"warnings":["Deferred until proof preparation"]},
+    {"id":"terminal-ending","pass":true,"applicable":true,"measurements":{"end_card_count":1,"end_card_start":5400,"proof_boundary":4500},"thresholds":{"end_card_count":1,"terminal_only":true},"failures":[],"warnings":[]},
+    {"id":"rendered-media-qa","pass":true,"applicable":false,"measurements":{},"thresholds":{},"failures":[],"warnings":["Runs only after render"]},
+    {"id":"rendered-speech-ending","pass":true,"applicable":false,"measurements":{},"thresholds":{},"failures":[],"warnings":["Runs only after render"]}
+  ],
+  "failures": [
+    "evidence-asset-integrity: missing assets: assets/captures/nist-ai-rmf.png, assets/captures/eu-ai-act.png, assets/captures/unesco-ai-ethics.png",
+    "evidence-asset-integrity: placeholder assets are not renderable evidence: assets/placeholders/context-lab.svg, assets/placeholders/context-chip.svg, assets/placeholders/context-grid.svg",
+    "evidence-asset-integrity: capture provenance missing: assets/captures/nist-ai-rmf.provenance.json, assets/captures/eu-ai-act.provenance.json, assets/captures/unesco-ai-ethics.provenance.json",
+    "music-cues: long-form film requires at least one canonical music cue",
+    "edit-plan-contract: compiled edit_plan.json is missing"
+  ]
+}

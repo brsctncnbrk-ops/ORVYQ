@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'agent/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source without implicit LFS pull
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: false
+
+      - name: Install and verify Git LFS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs install --local
+          for attempt in 1 2 3; do
+            if git lfs fetch --all && git lfs checkout; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          git lfs fsck
+
+      - name: Use Node.js 24 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.18.0
+
+      - name: Install exact dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Type-check canonical system
+        run: npm run typecheck
+
+      - name: Type-check Remotion composition
+        run: npm run typecheck:render
+
+      - name: Run invariant and regression tests
+        run: npm test
+
+      - name: Validate canonical example project
+        run: npm run orvyq -- validate --project-id 001-ai-race
+
+      - name: Compile canonical edit plan with shared metrics
+        run: npm run orvyq -- compile --project-id 001-ai-race

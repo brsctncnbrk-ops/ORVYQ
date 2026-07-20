@@ -1,0 +1,163 @@
+name: Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: projects/<project_id>/ to render
+        required: true
+        type: string
+      candidate_ref:
+        description: Branch, tag, or commit containing the proof candidate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-${{ inputs.project_id }}
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PROJECT_ID: ${{ inputs.project_id }}
+      CANDIDATE_REF: ${{ inputs.candidate_ref }}
+    steps:
+      - name: Validate project identifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{2,79}$ ]] || { echo "Invalid project_id"; exit 1; }
+
+      - name: Checkout candidate without implicit LFS pull
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.candidate_ref }}
+          fetch-depth: 0
+          lfs: false
+
+      - name: Record render source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RENDER_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Fetch and verify Git LFS objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs install --local
+          for attempt in 1 2 3; do
+            if git lfs fetch --all && git lfs checkout; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 10))
+          done
+          git lfs fsck
+
+      - name: Use Node.js 24 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.18.0
+
+      - name: Use Python for rendered speech QA
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund @remotion/cli@4.0.489
+          python -m pip install --requirement requirements-qa.txt
+          npx playwright install --with-deps chromium
+
+      - name: Validate canonical plan and timeline
+        run: npm run orvyq -- validate --project-id "$PROJECT_ID"
+
+      - name: Capture active official sources
+        run: npm run orvyq -- capture-sources --project-id "$PROJECT_ID"
+
+      - name: Build final narration timeline and captions
+        run: |
+          npm run orvyq -- prepare-audio --project-id "$PROJECT_ID"
+          npm run orvyq -- captions --project-id "$PROJECT_ID"
+          npm run orvyq -- compile --project-id "$PROJECT_ID"
+          npm run orvyq -- stage-render-assets --project-id "$PROJECT_ID"
+
+      - name: Run aggregate pre-render proof audit
+        run: npm run orvyq -- audit --project-id "$PROJECT_ID" --stage proof
+
+      - name: Type-check Remotion composition
+        run: npm run typecheck:render
+
+      - name: Resolve browser executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          BROWSER="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || true)"
+          [ -n "$BROWSER" ] || { echo "No supported browser found"; exit 1; }
+          "$BROWSER" --version
+          echo "ORVYQ_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
+
+      - name: Render canonical proof prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          BOUNDARY="$(node -e "const p=require('./projects/' + process.env.PROJECT_ID + '/direction/production_plan.json'); process.stdout.write(String(p.proof.boundary_frame))")"
+          END_FRAME=$((BOUNDARY - 1))
+          mkdir -p "projects/$PROJECT_ID/output"
+          npx remotion render src/render/index.ts ORVYQVideo "projects/$PROJECT_ID/output/proof.mp4" \
+            --props="projects/$PROJECT_ID/build/render_input.json" \
+            --frames="0-$END_FRAME" \
+            --concurrency=1 \
+            --max-retries=3 \
+            2>&1 | tee "projects/$PROJECT_ID/qa/proof-render.log"
+
+      - name: Transcribe rendered proof
+        run: |
+          python scripts/transcribe.py \
+            --input "projects/$PROJECT_ID/output/proof.mp4" \
+            --output "projects/$PROJECT_ID/build/proof_transcript.json"
+
+      - name: Run proof media, caption, and speech-ending QA
+        run: |
+          npm run orvyq -- rendered-qa --project-id "$PROJECT_ID" --mode proof \
+            --video "projects/$PROJECT_ID/output/proof.mp4" \
+            --transcript "projects/$PROJECT_ID/build/proof_transcript.json"
+          npm run orvyq -- proof-manifest --project-id "$PROJECT_ID"
+
+      - name: Write review metadata
+        shell: bash
+        run: |
+          cat > "projects/$PROJECT_ID/build/proof_review.json" <<JSON
+          {
+            "project_id": "$PROJECT_ID",
+            "proof_run_id": "$GITHUB_RUN_ID",
+            "render_source_commit": "$RENDER_SOURCE_COMMIT",
+            "proof_boundary_frame": $(node -e "const p=require('./projects/' + process.env.PROJECT_ID + '/direction/production_plan.json'); process.stdout.write(String(p.proof.boundary_frame))")
+          }
+          JSON
+
+      - name: Upload proof review artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: proof-${{ inputs.project_id }}-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            projects/${{ inputs.project_id }}/output/proof.mp4
+            projects/${{ inputs.project_id }}/build/proof_review.json
+            projects/${{ inputs.project_id }}/build/proof_prefix_manifest.json
+            projects/${{ inputs.project_id }}/build/proof_prefix.sha256
+            projects/${{ inputs.project_id }}/build/proof_transcript.json
+            projects/${{ inputs.project_id }}/qa/aggregate.proof.json
+            projects/${{ inputs.project_id }}/qa/rendered.proof.json
+            projects/${{ inputs.project_id }}/qa/proof-render.log
+            projects/${{ inputs.project_id }}/direction/production_plan.json
+            projects/${{ inputs.project_id }}/direction/narration_timeline.json
+            projects/${{ inputs.project_id }}/assets/captures/*.provenance.json

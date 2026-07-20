@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orvyq.local/schemas/narration_timeline.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "source_audio", "source_audio_duration_seconds", "editorial_pauses", "output_duration_seconds", "proof_semantic_end", "proof_boundary_frame", "final_word", "timeline_sha256"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,79}$"},
+    "source_audio": {"type": "string", "minLength": 1},
+    "source_audio_duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "editorial_pauses": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["after_word_index", "after_source_second", "duration_seconds", "reason"],
+        "properties": {
+          "after_word_index": {"type": "integer", "minimum": 0},
+          "after_source_second": {"type": "number", "minimum": 0},
+          "duration_seconds": {"type": "number", "minimum": 0},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "output_duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "proof_semantic_end": {"type": "string", "minLength": 1},
+    "proof_boundary_frame": {"type": "integer", "minimum": 2},
+    "final_word": {"type": "string", "minLength": 1},
+    "timeline_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

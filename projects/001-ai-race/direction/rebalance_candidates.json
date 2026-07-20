@@ -1,0 +1,32 @@
+[
+  {
+    "target_shot_id": "shot-016",
+    "priority": 100,
+    "replacement": {
+      "visual_type": "source_graphic",
+      "asset": "assets/graphics/graphic-comparison.svg",
+      "source_ids": ["src-nist", "src-eu"],
+      "claim_ids": ["claim-13"],
+      "source_backed": true,
+      "provenance_mode": "source_derived",
+      "full_screen_graphic": false,
+      "motif": "comparison-c",
+      "mobile_font_px": 48
+    }
+  },
+  {
+    "target_shot_id": "shot-018",
+    "priority": 90,
+    "replacement": {
+      "visual_type": "primary_capture",
+      "asset": "assets/captures/nist-ai-rmf.png",
+      "source_ids": ["src-nist"],
+      "claim_ids": ["claim-15"],
+      "source_backed": true,
+      "provenance_mode": "official_capture",
+      "full_screen_graphic": false,
+      "motif": "official-page-h",
+      "mobile_font_px": 42
+    }
+  }
+]
