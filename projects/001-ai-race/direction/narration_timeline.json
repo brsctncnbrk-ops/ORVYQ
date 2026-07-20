@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "project_id": "001-ai-race",
+  "source_audio": "assets/audio/final_voice.mp3",
+  "source_audio_duration_seconds": 719.928,
+  "editorial_pauses": [],
+  "output_duration_seconds": 719.928,
+  "proof_semantic_end": "Slowing down alone doesn't remove the risk. It just hands the frontier to whoever doesn't.",
+  "proof_boundary_frame": 6302,
+  "final_word": "now",
+  "timeline_sha256": "c7c4a010e15d702aa52bac969844900c1a71a48c227424e9c3de32cfddbc1fc8"
+}

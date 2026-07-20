@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "src-nist",
+      "url": "https://www.nist.gov/itl/ai-risk-management-framework",
+      "domain": "nist.gov",
+      "active": true,
+      "primary": true,
+      "required": true,
+      "license_or_basis": "Official U.S. government publication; captured for commentary and evidence."
+    },
+    {
+      "id": "src-eu",
+      "url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+      "domain": "eur-lex.europa.eu",
+      "active": true,
+      "primary": true,
+      "required": true,
+      "license_or_basis": "Official EU legal text; captured for commentary and evidence."
+    },
+    {
+      "id": "src-unesco",
+      "url": "https://www.unesco.org/en/artificial-intelligence/recommendation-ethics",
+      "domain": "unesco.org",
+      "active": true,
+      "primary": true,
+      "required": true,
+      "license_or_basis": "Official UNESCO policy page; captured for commentary and evidence."
+    }
+  ]
+}

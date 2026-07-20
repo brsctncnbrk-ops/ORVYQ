@@ -1,0 +1,11 @@
+Every major artificial intelligence lab says that moving too fast can be dangerous. Yet every major lab is still moving as fast as it can. The contradiction is not a failure to understand the risk. It is the structure of the race itself.
+
+A company that slows down does not slow its competitors. A government that pauses does not pause rival states. The actor that reaches a decisive capability first may shape standards, markets, military power, and the rules everyone else must live under. That possibility turns caution into a strategic disadvantage.
+
+The physical race is built on chips, electricity, data centers, talent, and capital. The institutional response is built on hearings, standards, laws, and international negotiation. These systems do not move at the same speed. Technical capability can change in months. Governance often needs years.
+
+Official frameworks already describe many of the risks: opacity, misuse, systemic failure, discrimination, concentration of power, and the difficulty of measuring capabilities before deployment. The evidence is not hidden. The problem is that evidence alone does not remove the competitive incentive.
+
+This is why the central question is larger than whether one laboratory behaves responsibly. The question is whether the system rewards responsibility when restraint can be exploited by someone else. A safe decision made by one actor can become a losing decision if no one else is bound by it.
+
+The race is therefore not driven by ignorance of danger, but by fear of being the only actor that slows down. After that point, the most important contest may not be who builds the most powerful system. It may be who gets to set the rules.

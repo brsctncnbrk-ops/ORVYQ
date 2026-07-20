@@ -1,0 +1,9 @@
+{
+  "projects": [
+    {
+      "project_id": "001-ai-race",
+      "status": "PLANNING",
+      "canonical_plan": "projects/001-ai-race/direction/production_plan.json"
+    }
+  ]
+}
