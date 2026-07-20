@@ -14,16 +14,13 @@ on:
   push:
     branches: ['agent/**']
     paths: ['proof_request.json']
-  pull_request:
-    paths: ['proof_request.json']
 
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 concurrency:
-  group: proof-${{ github.event_name == 'workflow_dispatch' && inputs.project_id || github.event.pull_request.head.ref || github.ref_name }}
+  group: proof-${{ github.event_name == 'workflow_dispatch' && inputs.project_id || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -34,7 +31,7 @@ jobs:
       - name: Checkout candidate without implicit LFS pull
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.sha }}
           fetch-depth: 0
           lfs: false
 
@@ -59,17 +56,14 @@ jobs:
           echo "RENDER_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Publish proof run tracker
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push'
         continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          if [ -z "$PR_NUMBER" ]; then
-            PR_NUMBER="$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')"
-          fi
+          PR_NUMBER="$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$PR_NUMBER" ]; then
             echo "PROOF_PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="ORVYQ proof run **$GITHUB_RUN_ID** started from commit \`$GITHUB_SHA\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
@@ -106,7 +100,7 @@ jobs:
           python -m pip install --requirement requirements-qa.txt
           npx playwright install --with-deps chromium
 
-       - name: Validate canonical plan and timeline
+      - name: Validate canonical plan and timeline
         run: npm run orvyq -- validate --project-id "$PROJECT_ID"
 
       - name: Materialize immutable external narration and prefix footage
@@ -214,7 +208,7 @@ jobs:
             projects/*/assets/graphics/generated/**
             projects/*/assets/music/**
       - name: Publish proof completion status
-        if: always() && (github.event_name == 'pull_request' || env.PROOF_PR_NUMBER != '')
+        if: always() && env.PROOF_PR_NUMBER != ''
         continue-on-error: true
         shell: bash
         env:
@@ -222,8 +216,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          if [ -z "$PR_NUMBER" ]; then PR_NUMBER="${PROOF_PR_NUMBER:-}"; fi
+          PR_NUMBER="${PROOF_PR_NUMBER:-}"
           if [ -z "$PR_NUMBER" ]; then exit 0; fi
           if [ "$JOB_STATUS" = "success" ]; then
             MESSAGE="ORVYQ proof run **$GITHUB_RUN_ID** completed successfully. Review artifact: \`proof-$GITHUB_RUN_ID\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
