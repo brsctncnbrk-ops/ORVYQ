@@ -1,43 +1,48 @@
-# ORVYQ Foundation Status
+# ORVYQ Production Status
 
-## Completed
+## Foundation
 
-- Clean repository architecture independent from the legacy FactForge orchestrator/state-machine.
-- One canonical `direction/production_plan.json` per project.
-- One canonical `direction/narration_timeline.json` per project.
-- Shared timeline transformation for narration, pauses, captions, music, and shot timing.
-- Proof-prefix approval continuity based on prefix SHA-256, narration timeline SHA-256, proof run ID, render source commit, human review score, and boundary frame.
-- Shared visual classification and measurement library.
-- Fail-closed policy validation for missing, null, NaN, and non-finite thresholds.
-- Structural post-proof rebalance engine with prefix immutability checks.
-- Aggregate audit suite covering the 15 required audit categories.
-- Official source capture utility with allowlisted redirects, retry/backoff, PNG validation, and provenance manifests.
-- One Remotion composition used by proof and full render.
-- `ci.yml`, `proof.yml`, and `render.yml` only.
-- Example project scaffolded under `projects/001-ai-race/`.
+- Clean architecture independent from the legacy FactForge orchestrator and state machine.
+- One `direction/production_plan.json` and one `direction/narration_timeline.json` per project.
+- One root CLI and one Remotion composition for proof and full render.
+- Shared visual classification library, aggregate audits, fail-closed policies, structural rebalance, official-source capture, rendered-media QA, and prefix-bound approval.
+- Only `ci.yml`, `proof.yml`, and `render.yml` are used.
 
-## Verified locally
+## First real project
 
-- TypeScript core compilation: PASS.
-- Remotion TypeScript compilation: PASS.
-- Regression/unit tests: 6/6 PASS.
-- JSON and YAML parsing: PASS.
-- Production-plan and narration-timeline JSON Schema validation: PASS.
-- Example-plan invariants: PASS.
-- Example policy measurements:
-  - Primary-source capture ratio: 33.33%.
-  - Physical evidence plus source-derived graphic ratio: 83.33%.
-  - Full-screen graphic ratio: 5.56%.
-  - Generic stock ratio: 0%.
-  - Longest uninterrupted evidence chain: 10 seconds.
+`projects/001-ai-race/` now represents the full 21,598-frame film rather than a short planning fixture.
 
-## Deliberately blocked
+Canonical measurements:
 
-The example project is not marked proof-ready until real narration audio, final alignment/captions, verified captures, licensed contextual footage, and final music cues are present. Missing media must fail closed rather than create a misleading successful proof.
+- Production shots: 46, followed by one terminal end card.
+- Primary-source capture ratio: 33.52%.
+- Source-backed evidence and graphics ratio: 69.28%.
+- Generic stock ratio: 0%.
+- Full-screen graphic ratio: 0%.
+- Longest uninterrupted physical-evidence chain: 16 seconds.
+- Maximum asset reuse: 1.
+- Maximum motif reuse: 1.
+- Licensed contextual footage assets: 15.
+- Proof boundary: frame 6,302, approximately 210.07 seconds.
 
-No full render has been started.
+## Deterministic migration
 
-## Remaining production inputs
+The legacy repository contributes only approved raw inputs:
 
-1. Real narration, alignment/captions, verified captures, licensed contextual footage, and music must be added before proof rendering.
-2. Proof must be reviewed and explicitly approved before any full render is started.
+- final narration,
+- licensed footage,
+- footage provenance records.
+
+The source repository and exact commit are pinned in `projects/001-ai-race/migration/external_assets.json`. Materialization verifies each Git LFS object's pointer SHA-256 and size before copying it into the ORVYQ project workspace. No legacy source code, workflow, state machine, or diagnostic script is executed.
+
+## Proof continuity
+
+The proof workflow stores an exact prefix bundle containing narration, alignment, captions, official capture variants, source-derived graphics, music cues, prefix manifests, rendered proof, and post-render QA. After human approval, full render restores that exact bundle before generating post-proof content.
+
+## Verification
+
+- Core TypeScript: PASS.
+- Remotion TypeScript: PASS.
+- Regression/unit tests: 7/7 PASS.
+- Canonical plan and narration timeline: PASS.
+- Full render: not started; explicitly blocked pending proof review.

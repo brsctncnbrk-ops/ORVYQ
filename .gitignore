@@ -8,3 +8,14 @@ projects/*/output/*
 projects/*/qa/*.runtime.json
 *.log
 .DS_Store
+
+# Runtime-materialized production media and generated proof assets
+projects/*/assets/audio/*
+!projects/*/assets/audio/.gitkeep
+projects/*/assets/footage/*
+!projects/*/assets/footage/.gitkeep
+projects/*/assets/captures/*
+!projects/*/assets/captures/.gitkeep
+projects/*/assets/graphics/generated/*
+projects/*/assets/music/*
+!projects/*/assets/music/.gitkeep

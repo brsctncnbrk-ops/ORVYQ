@@ -1,5 +1,5 @@
 import path from 'node:path';
-import {readdir, readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';
 import type {AuditResult, NarrationTimeline, ProductionPlan, ProofApproval} from '../types.js';
 import {planMetrics} from './classification.js';
 import {proofPrefixDigest, timelineDigest} from './hash.js';
@@ -13,13 +13,16 @@ function result(id: string, failures: string[], measurements: Record<string, unk
   return {id, pass: applicable ? failures.length === 0 : true, applicable, measurements, thresholds, failures, warnings};
 }
 
-async function assetIntegrity(projectDir: string, plan: ProductionPlan): Promise<AuditResult> {
+async function assetIntegrity(projectDir: string, plan: ProductionPlan, stage: 'planning' | 'proof' | 'full-pre-render' | 'post-render'): Promise<AuditResult> {
   const failures: string[] = [];
   const missing: string[] = [];
   const empty: string[] = [];
   const placeholderAssets: string[] = [];
   const missingProvenance: string[] = [];
-  const assets = [...new Set(plan.shots.map((s) => s.asset).concat(plan.music_cues.map((c) => c.asset)))];
+  const boundary = stage === 'proof' ? plan.proof.boundary_frame : plan.duration_frames;
+  const scopedShots = plan.shots.filter((shot) => shot.start_frame < boundary);
+  const scopedCues = plan.music_cues.filter((cue) => cue.start_frame < boundary);
+  const assets = [...new Set(scopedShots.map((s) => s.asset).concat(scopedCues.map((c) => c.asset)))];
   for (const asset of assets) {
     const full = path.join(projectDir, asset);
     if (asset.includes('/placeholders/') || asset.startsWith('assets/placeholders/')) placeholderAssets.push(asset);
@@ -29,12 +32,16 @@ async function assetIntegrity(projectDir: string, plan: ProductionPlan): Promise
       const provenance = full.replace(/\.png$/i, '.provenance.json');
       if (!(await exists(provenance))) missingProvenance.push(path.relative(projectDir, provenance));
     }
+    if (asset.startsWith('assets/footage/') && /\.(mp4|mov|mkv|webm)$/i.test(asset)) {
+      const provenance = `${full}.provenance.json`;
+      if (!(await exists(provenance))) missingProvenance.push(path.relative(projectDir, provenance));
+    }
   }
   if (missing.length) failures.push(`missing assets: ${missing.join(', ')}`);
   if (empty.length) failures.push(`empty assets: ${empty.join(', ')}`);
   if (placeholderAssets.length) failures.push(`placeholder assets are not renderable evidence: ${placeholderAssets.join(', ')}`);
-  if (missingProvenance.length) failures.push(`capture provenance missing: ${missingProvenance.join(', ')}`);
-  return result('evidence-asset-integrity', failures, {asset_count: assets.length, missing, empty, placeholderAssets, missingProvenance}, {missing: 0, empty: 0, placeholders: 0, missing_provenance: 0});
+  if (missingProvenance.length) failures.push(`asset provenance missing: ${missingProvenance.join(', ')}`);
+  return result('evidence-asset-integrity', failures, {stage, boundary_frame: boundary, asset_count: assets.length, missing, empty, placeholderAssets, missingProvenance}, {missing: 0, empty: 0, placeholders: 0, missing_provenance: 0});
 }
 
 async function approvalContinuity(projectDir: string, plan: ProductionPlan, timeline: NarrationTimeline, required: boolean): Promise<AuditResult> {
@@ -143,7 +150,7 @@ export async function aggregateAudit(projectDir: string, stage: 'planning' | 'pr
   results.push(result('narration-timeline', [...timelineSchema, ...validateTimeline(timeline, plan.fps)], {source_duration: timeline.source_audio_duration_seconds, output_duration: timeline.output_duration_seconds, pause_count: timeline.editorial_pauses.length, timeline_sha256: timelineDigest(timeline)}, {timeline_matches_plan_seconds: plan.duration_seconds}));
   results.push(await approvalContinuity(projectDir, plan, timeline, stage === 'full-pre-render' || stage === 'post-render'));
   results.push(result('evidence-coverage', visualPolicyFailures(plan), planMetrics(plan), {...plan.policies}));
-  results.push(await assetIntegrity(projectDir, plan));
+  results.push(await assetIntegrity(projectDir, plan, stage));
   results.push(semanticAlignment(plan));
   results.push(pacing(plan));
   results.push(mobileLegibility(plan));

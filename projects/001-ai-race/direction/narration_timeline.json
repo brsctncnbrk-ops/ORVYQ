@@ -1,31 +1,12 @@
 {
   "schema_version": 1,
   "project_id": "001-ai-race",
-  "source_audio": "assets/audio/final_voice.wav",
-  "source_audio_duration_seconds": 186,
-  "editorial_pauses": [
-    {
-      "after_word_index": 88,
-      "after_source_second": 38,
-      "duration_seconds": 1,
-      "reason": "opening thesis breath"
-    },
-    {
-      "after_word_index": 214,
-      "after_source_second": 91,
-      "duration_seconds": 1.5,
-      "reason": "section transition"
-    },
-    {
-      "after_word_index": 351,
-      "after_source_second": 146,
-      "duration_seconds": 1.5,
-      "reason": "proof paragraph landing"
-    }
-  ],
-  "output_duration_seconds": 190,
-  "proof_semantic_end": "The race is not driven by ignorance of the danger, but by fear of being the only actor that slows down.",
-  "proof_boundary_frame": 4500,
-  "final_word": "rules",
-  "timeline_sha256": "a6cb843d47c4cbbddc620c0fa5740dff4a628ae8890c600e51162fc5b03bd54e"
+  "source_audio": "assets/audio/final_voice.mp3",
+  "source_audio_duration_seconds": 719.928,
+  "editorial_pauses": [],
+  "output_duration_seconds": 719.928,
+  "proof_semantic_end": "Slowing down alone doesn't remove the risk. It just hands the frontier to whoever doesn't.",
+  "proof_boundary_frame": 6302,
+  "final_word": "now",
+  "timeline_sha256": "c7c4a010e15d702aa52bac969844900c1a71a48c227424e9c3de32cfddbc1fc8"
 }

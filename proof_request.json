@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "project_id": "001-ai-race",
+  "candidate_ref": "agent/orvyq-production-foundation",
+  "requested_reason": "First real canonical prefix review",
+  "proof_boundary_frame": 6302
+}

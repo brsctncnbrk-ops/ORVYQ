@@ -92,6 +92,6 @@ projects/<project_id>/
 └── output/                        # generated proof/final MP4
 ```
 
-The example `001-ai-race` project is a canonical planning fixture. It intentionally remains proof-blocked until the real narration, word alignment, official captures, licensed contextual footage, and music assets are supplied. The system does not report that incomplete fixture as production-ready.
+The `001-ai-race` project is the first full canonical production candidate. Its narration and licensed footage are materialized from a pinned immutable legacy commit with Git LFS SHA-256 verification; all ORVYQ plans, captures, graphics, music, alignment, captions, audits, and renders are produced by the clean ORVYQ system. Full render remains blocked until the real proof artifact is reviewed and explicitly approved.
 
 See `docs/ARCHITECTURE.md` and `docs/OPERATIONS.md`.

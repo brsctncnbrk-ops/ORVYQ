@@ -41,10 +41,11 @@ export async function captureSources(projectDir: string): Promise<{captured: num
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         const page = await browser.newPage({viewport: {width: 1920, height: 1080}, deviceScaleFactor: 1});
         try {
-          const response = await page.goto(source.url, {waitUntil: 'networkidle', timeout: 45_000});
+          const response = await page.goto(source.url, {waitUntil: 'domcontentloaded', timeout: 45_000});
           if (!response || response.status() >= 400) throw new Error(`HTTP ${response?.status() ?? 'no response'}`);
           const finalHost = new URL(page.url()).hostname;
           if (!(finalHost === source.domain || finalHost.endsWith(`.${source.domain}`))) throw new Error(`redirected outside allowlisted domain to ${finalHost}`);
+          await page.waitForTimeout(2500);
           await page.screenshot({path: path.join(outputDir, `${source.id}.png`), fullPage: false});
           const file = path.join(outputDir, `${source.id}.png`);
           const bytes = await readFile(file);

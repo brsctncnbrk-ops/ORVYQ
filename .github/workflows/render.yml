@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: full-render-${{ inputs.project_id }}
@@ -61,6 +62,40 @@ jobs:
           done
           git lfs fsck
 
+      - name: Resolve approved proof run
+        id: approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          APPROVAL="projects/$PROJECT_ID/direction/proof_approval.json"
+          test -f "$APPROVAL" || { echo "Proof approval is missing"; exit 1; }
+          RUN_ID="$(jq -r '.proof_run_id' "$APPROVAL")"
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]] || { echo "Invalid proof_run_id"; exit 1; }
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact approved proof bundle
+        uses: actions/download-artifact@v6
+        with:
+          name: proof-${{ steps.approval.outputs.run_id }}
+          run-id: ${{ steps.approval.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: /tmp/approved-proof
+
+      - name: Restore approved prefix assets, narration, and captions
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="/tmp/approved-proof/projects/$PROJECT_ID"
+          test -d "$SOURCE" || { echo "Approved proof bundle project path missing"; find /tmp/approved-proof -maxdepth 4 -type f; exit 1; }
+          mkdir -p "projects/$PROJECT_ID/assets/captures/variants" "projects/$PROJECT_ID/assets/graphics/generated" "projects/$PROJECT_ID/assets/music" "projects/$PROJECT_ID/build" "projects/$PROJECT_ID/direction"
+          cp -a "$SOURCE/assets/captures/variants/." "projects/$PROJECT_ID/assets/captures/variants/" 2>/dev/null || true
+          cp -a "$SOURCE/assets/graphics/generated/." "projects/$PROJECT_ID/assets/graphics/generated/" 2>/dev/null || true
+          cp -a "$SOURCE/assets/music/." "projects/$PROJECT_ID/assets/music/" 2>/dev/null || true
+          cp "$SOURCE/build/narration_final.wav" "projects/$PROJECT_ID/build/narration_final.wav"
+          cp "$SOURCE/build/captions.json" "projects/$PROJECT_ID/build/captions.json"
+          cp "$SOURCE/build/captions.srt" "projects/$PROJECT_ID/build/captions.srt"
+          cp "$SOURCE/direction/word_alignment.json" "projects/$PROJECT_ID/direction/word_alignment.json"
+
       - name: Use Node.js 24 LTS
         uses: actions/setup-node@v6
         with:
@@ -82,14 +117,17 @@ jobs:
       - name: Validate canonical plan and timeline
         run: npm run orvyq -- validate --project-id "$PROJECT_ID"
 
+      - name: Materialize immutable external narration and full footage set
+        run: npm run orvyq -- materialize-assets --project-id "$PROJECT_ID" --mode full
+
       - name: Capture active official sources
         run: npm run orvyq -- capture-sources --project-id "$PROJECT_ID"
 
-      - name: Build full narration, captions, and edit plan
-        run: |
-          npm run orvyq -- prepare-audio --project-id "$PROJECT_ID"
-          npm run orvyq -- captions --project-id "$PROJECT_ID"
-          npm run orvyq -- compile --project-id "$PROJECT_ID"
+      - name: Build deterministic visual variants and music cues
+        run: npm run orvyq -- prepare-visuals --project-id "$PROJECT_ID" --mode full
+
+      - name: Compile full edit plan from approved narration and captions
+        run: npm run orvyq -- compile --project-id "$PROJECT_ID"
 
       - name: Verify approved prefix and full pre-render readiness
         run: npm run orvyq -- audit --project-id "$PROJECT_ID" --stage full-pre-render
@@ -150,4 +188,5 @@ jobs:
             projects/${{ inputs.project_id }}/direction/production_plan.json
             projects/${{ inputs.project_id }}/direction/narration_timeline.json
             projects/${{ inputs.project_id }}/direction/proof_approval.json
-            projects/${{ inputs.project_id }}/assets/captures/*.provenance.json
+            projects/${{ inputs.project_id }}/assets/captures/**/*.provenance.json
+            projects/${{ inputs.project_id }}/build/external_assets.full.provenance.json

@@ -11,42 +11,50 @@ on:
         description: Branch, tag, or commit containing the proof candidate
         required: true
         type: string
+  push:
+    branches: ['agent/**']
+    paths: ['proof_request.json']
 
 permissions:
   contents: read
 
 concurrency:
-  group: proof-${{ inputs.project_id }}
+  group: proof-${{ github.event_name == 'workflow_dispatch' && inputs.project_id || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   proof:
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    env:
-      PROJECT_ID: ${{ inputs.project_id }}
-      CANDIDATE_REF: ${{ inputs.candidate_ref }}
     steps:
-      - name: Validate project identifier
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{2,79}$ ]] || { echo "Invalid project_id"; exit 1; }
-
       - name: Checkout candidate without implicit LFS pull
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.candidate_ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.sha }}
           fetch-depth: 0
           lfs: false
 
-      - name: Record render source commit
+      - name: Resolve proof request and source commit
         shell: bash
+        env:
+          DISPATCH_PROJECT_ID: ${{ inputs.project_id }}
+          DISPATCH_CANDIDATE_REF: ${{ inputs.candidate_ref }}
         run: |
           set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            PROJECT_ID="$DISPATCH_PROJECT_ID"
+            CANDIDATE_REF="$DISPATCH_CANDIDATE_REF"
+          else
+            test -f proof_request.json
+            PROJECT_ID="$(jq -r '.project_id' proof_request.json)"
+            CANDIDATE_REF="$(git rev-parse HEAD)"
+          fi
+          [[ "$PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{2,79}$ ]] || { echo "Invalid project_id"; exit 1; }
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
+          echo "CANDIDATE_REF=$CANDIDATE_REF" >> "$GITHUB_ENV"
           echo "RENDER_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
-      - name: Fetch and verify Git LFS objects
+      - name: Fetch and verify repository Git LFS objects
         shell: bash
         run: |
           set -euo pipefail
@@ -63,7 +71,7 @@ jobs:
         with:
           node-version: 24.18.0
 
-      - name: Use Python for rendered speech QA
+      - name: Use Python for alignment and rendered speech QA
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -79,10 +87,25 @@ jobs:
       - name: Validate canonical plan and timeline
         run: npm run orvyq -- validate --project-id "$PROJECT_ID"
 
+      - name: Materialize immutable external narration and prefix footage
+        run: npm run orvyq -- materialize-assets --project-id "$PROJECT_ID" --mode proof
+
       - name: Capture active official sources
         run: npm run orvyq -- capture-sources --project-id "$PROJECT_ID"
 
-      - name: Build final narration timeline and captions
+      - name: Build deterministic visual variants and music cues
+        run: npm run orvyq -- prepare-visuals --project-id "$PROJECT_ID" --mode proof
+
+      - name: Align source narration with word timestamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_AUDIO="$(node -e "const t=require('./projects/' + process.env.PROJECT_ID + '/direction/narration_timeline.json'); process.stdout.write(t.source_audio)")"
+          python scripts/transcribe.py \
+            --input "projects/$PROJECT_ID/$SOURCE_AUDIO" \
+            --output "projects/$PROJECT_ID/direction/word_alignment.json"
+
+      - name: Build final narration timeline, captions, and edit plan
         run: |
           npm run orvyq -- prepare-audio --project-id "$PROJECT_ID"
           npm run orvyq -- captions --project-id "$PROJECT_ID"
@@ -146,18 +169,25 @@ jobs:
       - name: Upload proof review artifact
         uses: actions/upload-artifact@v6
         with:
-          name: proof-${{ inputs.project_id }}-${{ github.run_id }}
+          name: proof-${{ github.run_id }}
           if-no-files-found: error
           retention-days: 14
           path: |
-            projects/${{ inputs.project_id }}/output/proof.mp4
-            projects/${{ inputs.project_id }}/build/proof_review.json
-            projects/${{ inputs.project_id }}/build/proof_prefix_manifest.json
-            projects/${{ inputs.project_id }}/build/proof_prefix.sha256
-            projects/${{ inputs.project_id }}/build/proof_transcript.json
-            projects/${{ inputs.project_id }}/qa/aggregate.proof.json
-            projects/${{ inputs.project_id }}/qa/rendered.proof.json
-            projects/${{ inputs.project_id }}/qa/proof-render.log
-            projects/${{ inputs.project_id }}/direction/production_plan.json
-            projects/${{ inputs.project_id }}/direction/narration_timeline.json
-            projects/${{ inputs.project_id }}/assets/captures/*.provenance.json
+            projects/*/output/proof.mp4
+            projects/*/build/proof_review.json
+            projects/*/build/proof_prefix_manifest.json
+            projects/*/build/proof_prefix.sha256
+            projects/*/build/proof_transcript.json
+            projects/*/build/narration_final.wav
+            projects/*/build/captions.json
+            projects/*/build/captions.srt
+            projects/*/direction/word_alignment.json
+            projects/*/build/external_assets.proof.provenance.json
+            projects/*/qa/aggregate.proof.json
+            projects/*/qa/rendered.proof.json
+            projects/*/qa/proof-render.log
+            projects/*/direction/production_plan.json
+            projects/*/direction/narration_timeline.json
+            projects/*/assets/captures/variants/**
+            projects/*/assets/graphics/generated/**
+            projects/*/assets/music/**
