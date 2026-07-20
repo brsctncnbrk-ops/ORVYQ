@@ -1,0 +1,234 @@
+name: Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: projects/<project_id>/ to render
+        required: true
+        type: string
+      candidate_ref:
+        description: Branch, tag, or commit containing the proof candidate
+        required: true
+        type: string
+  push:
+    branches: ['agent/**']
+    paths: ['proof_request.json']
+  pull_request:
+    paths: ['proof_request.json']
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: proof-${{ github.event_name == 'workflow_dispatch' && inputs.project_id || github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout candidate without implicit LFS pull
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          lfs: false
+
+      - name: Resolve proof request and source commit
+        shell: bash
+        env:
+          DISPATCH_PROJECT_ID: ${{ inputs.project_id }}
+          DISPATCH_CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            PROJECT_ID="$DISPATCH_PROJECT_ID"
+            CANDIDATE_REF="$DISPATCH_CANDIDATE_REF"
+          else
+            test -f proof_request.json
+            PROJECT_ID="$(jq -r '.project_id' proof_request.json)"
+            CANDIDATE_REF="$(git rev-parse HEAD)"
+          fi
+          [[ "$PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{2,79}$ ]] || { echo "Invalid project_id"; exit 1; }
+          echo "PROJECT_ID=$PROJECT_ID" >> "$GITHUB_ENV"
+          echo "CANDIDATE_REF=$CANDIDATE_REF" >> "$GITHUB_ENV"
+          echo "RENDER_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Publish proof run tracker
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER="$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')"
+          fi
+          if [ -n "$PR_NUMBER" ]; then
+            echo "PROOF_PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="ORVYQ proof run **$GITHUB_RUN_ID** started from commit \`$GITHUB_SHA\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
+          fi
+
+      - name: Fetch and verify repository Git LFS objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs install --local
+          for attempt in 1 2 3; do
+            if git lfs fetch --all && git lfs checkout; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 10))
+          done
+          git lfs fsck
+
+      - name: Use Node.js 24 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.18.0
+
+      - name: Use Python for alignment and rendered speech QA
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-qa.txt
+
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund @remotion/cli@4.0.489
+          python -m pip install --requirement requirements-qa.txt
+          npx playwright install --with-deps chromium
+
+       - name: Validate canonical plan and timeline
+        run: npm run orvyq -- validate --project-id "$PROJECT_ID"
+
+      - name: Materialize immutable external narration and prefix footage
+        run: npm run orvyq -- materialize-assets --project-id "$PROJECT_ID" --mode proof
+
+      - name: Capture active official sources
+        run: npm run orvyq -- capture-sources --project-id "$PROJECT_ID"
+
+      - name: Build deterministic visual variants and music cues
+        run: npm run orvyq -- prepare-visuals --project-id "$PROJECT_ID" --mode proof
+
+      - name: Align source narration with word timestamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_AUDIO="$(node -e "const t=require('./projects/' + process.env.PROJECT_ID + '/direction/narration_timeline.json'); process.stdout.write(t.source_audio)")"
+          python scripts/transcribe.py \
+            --input "projects/$PROJECT_ID/$SOURCE_AUDIO" \
+            --output "projects/$PROJECT_ID/direction/word_alignment.json"
+
+      - name: Build final narration timeline, captions, and edit plan
+        run: |
+          npm run orvyq -- prepare-audio --project-id "$PROJECT_ID"
+          npm run orvyq -- captions --project-id "$PROJECT_ID"
+          npm run orvyq -- compile --project-id "$PROJECT_ID"
+          npm run orvyq -- stage-render-assets --project-id "$PROJECT_ID"
+
+      - name: Run aggregate pre-render proof audit
+        run: npm run orvyq -- audit --project-id "$PROJECT_ID" --stage proof
+
+      - name: Type-check Remotion composition
+        run: npm run typecheck:render
+
+      - name: Resolve browser executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          BROWSER="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || true)"
+          [ -n "$BROWSER" ] || { echo "No supported browser found"; exit 1; }
+          "$BROWSER" --version
+          echo "ORVYQ_BROWSER_EXECUTABLE=$BROWSER" >> "$GITHUB_ENV"
+
+      - name: Render canonical proof prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          BOUNDARY="$(node -e "const p=require('./projects/' + process.env.PROJECT_ID + '/direction/production_plan.json'); process.stdout.write(String(p.proof.boundary_frame))")"
+          END_FRAME=$((BOUNDARY - 1))
+          mkdir -p "projects/$PROJECT_ID/output"
+          npx remotion render src/render/index.ts ORVYQVideo "projects/$PROJECT_ID/output/proof.mp4" \
+            --props="projects/$PROJECT_ID/build/render_input.json" \
+            --frames="0-$END_FRAME" \
+            --concurrency=1 \
+            --max-retries=3 \
+            2>&1 | tee "projects/$PROJECT_ID/qa/proof-render.log"
+
+      - name: Transcribe rendered proof
+        run: |
+          python scripts/transcribe.py \
+            --input "projects/$PROJECT_ID/output/proof.mp4" \
+            --output "projects/$PROJECT_ID/build/proof_transcript.json"
+
+      - name: Run proof media, caption, and speech-ending QA
+        run: |
+          npm run orvyq -- rendered-qa --project-id "$PROJECT_ID" --mode proof \
+            --video "projects/$PROJECT_ID/output/proof.mp4" \
+            --transcript "projects/$PROJECT_ID/build/proof_transcript.json"
+          npm run orvyq -- proof-manifest --project-id "$PROJECT_ID"
+
+      - name: Write review metadata
+        shell: bash
+        run: |
+          cat > "projects/$PROJECT_ID/build/proof_review.json" <<JSON
+          {
+            "project_id": "$PROJECT_ID",
+            "proof_run_id": "$GITHUB_RUN_ID",
+            "render_source_commit": "$RENDER_SOURCE_COMMIT",
+            "proof_boundary_frame": $(node -e "const p=require('./projects/' + process.env.PROJECT_ID + '/direction/production_plan.json'); process.stdout.write(String(p.proof.boundary_frame))")
+          }
+          JSON
+
+      - name: Upload proof review artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: proof-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            projects/*/output/proof.mp4
+            projects/*/build/proof_review.json
+            projects/*/build/proof_prefix_manifest.json
+            projects/*/build/proof_prefix.sha256
+            projects/*/build/proof_transcript.json
+            projects/*/build/narration_final.wav
+            projects/*/build/captions.json
+            projects/*/build/captions.srt
+            projects/*/direction/word_alignment.json
+            projects/*/build/external_assets.proof.provenance.json
+            projects/*/qa/aggregate.proof.json
+            projects/*/qa/rendered.proof.json
+            projects/*/qa/proof-render.log
+            projects/*/direction/production_plan.json
+            projects/*/direction/narration_timeline.json
+            projects/*/assets/captures/variants/**
+            projects/*/assets/graphics/generated/**
+            projects/*/assets/music/**
+      - name: Publish proof completion status
+        if: always() && (github.event_name == 'pull_request' || env.PROOF_PR_NUMBER != '')
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then PR_NUMBER="${PROOF_PR_NUMBER:-}"; fi
+          if [ -z "$PR_NUMBER" ]; then exit 0; fi
+          if [ "$JOB_STATUS" = "success" ]; then
+            MESSAGE="ORVYQ proof run **$GITHUB_RUN_ID** completed successfully. Review artifact: \`proof-$GITHUB_RUN_ID\`. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          else
+            MESSAGE="ORVYQ proof run **$GITHUB_RUN_ID** finished with status **$JOB_STATUS**. Actions: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$MESSAGE" >/dev/null
+
